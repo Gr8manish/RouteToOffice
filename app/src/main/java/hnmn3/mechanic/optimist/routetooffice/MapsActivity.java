@@ -12,6 +12,8 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,6 +35,7 @@ import com.google.android.gms.maps.model.PolylineOptions;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import hnmn3.mechanic.optimist.routetooffice.POJO.Example;
 import hnmn3.mechanic.optimist.routetooffice.POJO.Route;
@@ -42,14 +45,25 @@ import retrofit.GsonConverterFactory;
 import retrofit.Response;
 import retrofit.Retrofit;
 
+import static android.view.View.GONE;
+
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,
         LocationListener,
         GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener {
+        GoogleApiClient.OnConnectionFailedListener, View.OnClickListener {
 
     private GoogleMap mMap;
     private GoogleApiClient mGoogleApiClient;
-    LatLng origin;
+    private Long prevTime=null,currTime=null;
+
+    //Buttons to start and stop
+    Button btnStart,btnStop;
+
+    //Current location marker
+    Marker currMarker=null;
+
+    //Current location & previous location
+    Location currLocation,prevLocation;
 
     //Latitude & Longitude of Some random destination in pune
     String dest="26.854260,75.805000";
@@ -61,14 +75,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     * */
     LocationRequest mLocationRequest;
 
+    Boolean isInitialized=false,isStart=false,isFirstTimeLocationChange=true;
+
     /*
     * In a Google Maps App, it is always required to update current location of user at regular intervals.
      * Also we may also want current velocity, altitude etc. These all are covered inside location object
     * */
     Location mLastLocation;
 
-
-    Marker mCurrLocationMarker;
+    //Measured distance;
+    float distance=0.0f;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,6 +94,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         tvDistance = (TextView)findViewById(R.id.tvDistance);
         tvTime = (TextView)findViewById(R.id.tvTime);
         tvCost = (TextView)findViewById(R.id.tvCost);
+
+        btnStart = (Button) findViewById(R.id.btnStart);
+        btnStop = (Button) findViewById(R.id.btnStop);
+        btnStop.setVisibility(GONE);
+        btnStart.setVisibility(View.VISIBLE);
+        tvCost.setVisibility(GONE);
+
+        btnStart.setOnClickListener(this);
+        btnStop.setOnClickListener(this);
 
         /*
         * In Android 6.0 Marshmallow, application will not be granted any permission at installation time.
@@ -150,19 +175,64 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onLocationChanged(Location location)
     {
-        Toast.makeText(this, "onLocationChanged()", Toast.LENGTH_SHORT).show();
         mLastLocation = location;
-        if (mCurrLocationMarker != null) {
-            mCurrLocationMarker.remove();
+        if (currMarker != null) {
+            currMarker.remove();
         }
 
-        setMarkerToLocation(mLastLocation);
+        if(isFirstTimeLocationChange){
+            build_retrofit_and_get_response();
+            isFirstTimeLocationChange=false;
+        }
 
-        //stop location updates
-        //Todo
-        // remove this code
-        if (mGoogleApiClient != null) {
-            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient,this);
+        if(!isInitialized && isStart){
+            prevLocation = location;
+            currLocation = location;
+            prevTime = System.currentTimeMillis();
+            currTime = System.currentTimeMillis();
+            isInitialized=true;
+        }else if(isStart){
+            prevLocation = currLocation;
+            currLocation = location;
+
+            long millis = prevTime - System.currentTimeMillis();
+            long hours = TimeUnit.MILLISECONDS.toHours(millis) % 24;
+            long minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60;
+            long seconds = TimeUnit.MILLISECONDS.toSeconds(millis);
+            String time = String.format("%02d:%02d:%02d",-hours, -minutes, -(seconds% 60));
+
+            tvTime.setText("Time = "+time);
+
+            //1 paisa per second & 1 paisa per meter
+            float cost = ((-seconds) + distance)/100.0f;
+
+            tvCost.setText("Cost = "+cost+" rupees");
+            distance+= prevLocation.distanceTo(currLocation);
+            tvDistance.setText("Distance = "+distance+" meters");
+            currMarker = setMarkerToLocation(mLastLocation);
+        }
+    }
+
+    @Override
+    public void onClick(View v) {
+        switch(v.getId()){
+            case R.id.btnStart:
+                btnStop.setVisibility(View.VISIBLE);
+                btnStart.setVisibility(GONE);
+                tvCost.setVisibility(View.VISIBLE);
+
+                tvTime.setText("Time = 00:00:00");
+                tvDistance.setText("Distance = 0 meters");
+                tvCost.setText("Cost = 0 rupees");
+                distance = 0;
+                isInitialized = false;
+                isStart=true;
+                break;
+            case R.id.btnStop:
+                btnStop.setVisibility(GONE);
+                btnStart.setVisibility(View.VISIBLE);
+                isStart=false;
+                break;
         }
     }
 
@@ -182,27 +252,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             //getting last known location
             mLastLocation = LocationServices.FusedLocationApi.getLastLocation(
                     mGoogleApiClient);
-            Toast.makeText(this, String.valueOf(mLastLocation.getLatitude())+"", Toast.LENGTH_SHORT).show();
-            setMarkerToLocation(mLastLocation);
-            build_retrofit_and_get_response();
-
+            currMarker = setMarkerToLocation(mLastLocation);
             //setting location change listener
             LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
         }
     }
 
-    public void setMarkerToLocation(Location location){
+    public Marker setMarkerToLocation(Location location){
         //Place current location marker
         LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
         MarkerOptions markerOptions = new MarkerOptions();
         markerOptions.position(latLng);
         markerOptions.title("Current Position");
         markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
-        mCurrLocationMarker = mMap.addMarker(markerOptions);
+
+        currMarker = mMap.addMarker(markerOptions);
 
         //move map camera
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
         mMap.animateCamera(CameraUpdateFactory.zoomTo(17));
+
+        return currMarker;
     }
 
     @Override
@@ -323,9 +393,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
                 try {
 
-                    Toast.makeText(MapsActivity.this, response.body().getRoutes().size()+"", Toast.LENGTH_SHORT).show();
-
-
                     List<Route> routes = response.body().getRoutes();
 
                     // This loop will go through all the results and add marker on each location.
@@ -334,6 +401,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         String time = routes.get(0).getLegs().get(0).getDuration().getText();
                         tvDistance.setText(tvDistance.getText() + distance);
                         tvTime.setText(tvTime.getText() + time);
+
                         String encodedString = routes.get(0).getOverviewPolyline().getPoints();
                         List<LatLng> list = decodePoly(encodedString);
                         mMap.addPolyline(new PolylineOptions()

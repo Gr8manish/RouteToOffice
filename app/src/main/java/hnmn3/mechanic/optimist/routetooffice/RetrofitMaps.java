@@ -13,7 +13,7 @@ public interface RetrofitMaps {
     /*
      * This method will return the details from Google Direction API
      */
-    @GET("api/directions/json?key=AIzaSyC22GfkHu9FdgT9SwdCWMwKX1a4aohGifM")
+    @GET("api/directions/json?key=AIzaSyDrMCjKrTEWVf3EUmsPbb4pcLImga6a5WM")
     Call<Example> getDetailsFromDirectionAPI(@Query("units") String units, @Query("origin") String origin, @Query("destination") String destination, @Query("mode") String mode, @Query("alternatives") String bool);
 
 }
