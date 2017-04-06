@@ -11,3 +11,5 @@ START button is used to start calculating time, distance & cost.
 STOP button is used to stop calculating time, distance & cost. 
 6. The cost calculation is based on time & distance. 
 1 paisa per meter or second. 
+
+**Technologies Used :** Android, XML,Java, Google Maps, Retrofit Library
