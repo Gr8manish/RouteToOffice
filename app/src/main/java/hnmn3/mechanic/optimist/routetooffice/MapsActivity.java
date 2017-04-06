@@ -149,8 +149,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         else {
             buildGoogleApiClient();
         }
-
-        mMap.setMyLocationEnabled(true);
     }
 
 
@@ -259,9 +257,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     public Marker setMarkerToLocation(Location location){
-        //Place current location marker
-        LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+
+        //place destination marker
+        LatLng latLng = new LatLng(26.854260,75.805000);
         MarkerOptions markerOptions = new MarkerOptions();
+        markerOptions.position(latLng);
+        markerOptions.title("Destination Position");
+        markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
+        mMap.addMarker(markerOptions);
+
+        //Place current location marker
+        latLng = new LatLng(location.getLatitude(), location.getLongitude());
+        markerOptions = new MarkerOptions();
         markerOptions.position(latLng);
         markerOptions.title("Current Position");
         markerOptions.icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE));
